@@ -4,25 +4,28 @@ import UIKit
 #endif
 
 struct ContentView: View {
+    @ObservedObject var store: CollectionStore
     @State private var gridColumns = 2
     @State private var selectedFilter: CollectionFilter = .all
     @State private var searchPresented = false
-
-    private let records = RecordCard.sample
 
     private var columns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: CrateSpacing.m), count: gridColumns)
     }
 
-    private var filteredRecords: [RecordCard] {
+    private var filteredRecords: [Record] {
         switch selectedFilter {
         case .all:
-            return records
+            return store.records
         case .recent:
-            return records.filter { $0.isRecent }
+            return store.records.sorted { $0.createdAt > $1.createdAt }.prefix(6).map(\.self)
         case .needsSync:
-            return records.filter { $0.needsSync }
+            return store.records.filter { $0.syncStatus != .synced }
         }
+    }
+
+    private var syncedCount: Int {
+        store.records.filter { $0.syncStatus == .synced }.count
     }
 
     var body: some View {
@@ -36,18 +39,26 @@ struct ContentView: View {
                         Color.clear.frame(height: 88)
                         FilterPills(selected: $selectedFilter)
                             .padding(.horizontal, CrateSpacing.l)
-                        LazyVGrid(columns: columns, spacing: CrateSpacing.l) {
-                            ForEach(filteredRecords) { record in
-                                NavigationLink {
-                                    RecordDetailView(record: record)
-                                } label: {
-                                    ArtworkCard(record: record)
+                        if filteredRecords.isEmpty, store.hasLoaded {
+                            EmptyCollectionView(
+                                isFiltered: selectedFilter != .all,
+                                hasError: store.errorMessage != nil
+                            )
+                            .padding(.horizontal, CrateSpacing.l)
+                        } else {
+                            LazyVGrid(columns: columns, spacing: CrateSpacing.l) {
+                                ForEach(filteredRecords) { record in
+                                    NavigationLink {
+                                        RecordDetailView(record: record)
+                                    } label: {
+                                        ArtworkCard(record: record)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .padding(.horizontal, CrateSpacing.l)
+                            .padding(.bottom, 140)
                         }
-                        .padding(.horizontal, CrateSpacing.l)
-                        .padding(.bottom, 140)
                     }
                 }
                 .gesture(
@@ -59,7 +70,8 @@ struct ContentView: View {
 
                 GlassTopBar(
                     title: "Collection",
-                    totalCount: filteredRecords.count,
+                    totalCount: store.records.count,
+                    syncedCount: syncedCount,
                     onSearchTap: { searchPresented = true }
                 )
             }
@@ -74,6 +86,12 @@ struct ContentView: View {
                     .presentationDragIndicator(.visible)
             }
             .modifier(HideNavigationBarOnIOS())
+            .task {
+                await store.bootstrap()
+            }
+            .refreshable {
+                await store.reload()
+            }
         }
     }
 
@@ -96,29 +114,6 @@ private enum CollectionFilter: String, CaseIterable, Identifiable {
     case needsSync = "Needs Sync"
 
     var id: String { rawValue }
-}
-
-private struct RecordCard: Identifiable {
-    let id = UUID()
-    let title: String
-    let artist: String
-    let year: Int
-    let condition: String
-    let hue: Double
-    let needsSync: Bool
-    let isRecent: Bool
-
-    static let sample: [RecordCard] = [
-        RecordCard(title: "Moon Safari", artist: "Air", year: 1998, condition: "NM", hue: 0.08, needsSync: false, isRecent: true),
-        RecordCard(title: "Kind of Blue", artist: "Miles Davis", year: 1959, condition: "VG+", hue: 0.61, needsSync: true, isRecent: false),
-        RecordCard(title: "Discovery", artist: "Daft Punk", year: 2001, condition: "NM", hue: 0.84, needsSync: false, isRecent: true),
-        RecordCard(title: "Blue Train", artist: "John Coltrane", year: 1957, condition: "VG", hue: 0.55, needsSync: false, isRecent: false),
-        RecordCard(title: "Currents", artist: "Tame Impala", year: 2015, condition: "M", hue: 0.92, needsSync: true, isRecent: true),
-        RecordCard(title: "In Rainbows", artist: "Radiohead", year: 2007, condition: "NM", hue: 0.38, needsSync: false, isRecent: false),
-        RecordCard(title: "The Dark Side of the Moon", artist: "Pink Floyd", year: 1973, condition: "VG+", hue: 0.74, needsSync: false, isRecent: true),
-        RecordCard(title: "Aja", artist: "Steely Dan", year: 1977, condition: "VG+", hue: 0.14, needsSync: false, isRecent: false),
-        RecordCard(title: "Mezzanine", artist: "Massive Attack", year: 1998, condition: "NM", hue: 0.49, needsSync: true, isRecent: true)
-    ]
 }
 
 private enum CrateColor {
@@ -168,6 +163,7 @@ private struct CrateBackgroundGlow: View {
 private struct GlassTopBar: View {
     let title: String
     let totalCount: Int
+    let syncedCount: Int
     let onSearchTap: () -> Void
 
     var body: some View {
@@ -194,7 +190,7 @@ private struct GlassTopBar: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(CrateColor.secondary)
                 Spacer()
-                Text("Synced")
+                Text("\(syncedCount) synced")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(CrateColor.secondary)
             }
@@ -245,7 +241,7 @@ private struct FilterPills: View {
 }
 
 private struct ArtworkCard: View {
-    let record: RecordCard
+    let record: Record
 
     var body: some View {
         VStack(alignment: .leading, spacing: CrateSpacing.s) {
@@ -254,8 +250,8 @@ private struct ArtworkCard: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(hue: record.hue, saturation: 0.45, brightness: 0.95),
-                                Color(hue: record.hue, saturation: 0.55, brightness: 0.30)
+                                Color(hue: record.artworkHue, saturation: 0.45, brightness: 0.95),
+                                Color(hue: record.artworkHue, saturation: 0.55, brightness: 0.30)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -271,7 +267,7 @@ private struct ArtworkCard: View {
                             .fill(.black.opacity(0.35))
                             .frame(width: 20, height: 20)
                     )
-                if record.needsSync {
+                if record.syncStatus != .synced {
                     VStack {
                         HStack {
                             Spacer()
@@ -298,7 +294,7 @@ private struct ArtworkCard: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(CrateColor.primary)
                 .lineLimit(1)
-            Text("\(record.artist) • \(record.year)")
+            Text(record.metadataLine)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(CrateColor.secondary)
                 .lineLimit(1)
@@ -340,7 +336,7 @@ private struct SearchSheet: View {
                         .foregroundStyle(CrateColor.primary)
                         .padding(CrateSpacing.l)
                         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    Text("Search UI placeholder for v1")
+                    Text("Local collection search ships first. Discogs lookup comes after sync/auth wiring.")
                         .font(.footnote)
                         .foregroundStyle(CrateColor.secondary)
                     Spacer()
@@ -368,7 +364,7 @@ private struct SearchSheet: View {
 }
 
 private struct RecordDetailView: View {
-    let record: RecordCard
+    let record: Record
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -385,7 +381,7 @@ private struct RecordDetailView: View {
                         Text(record.artist)
                             .font(.title3.weight(.medium))
                             .foregroundStyle(CrateColor.secondary)
-                        Text("\(record.year) • Condition \(record.condition)")
+                        Text(record.detailLine)
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(CrateColor.secondary)
                     }
@@ -401,7 +397,7 @@ private struct RecordDetailView: View {
 }
 
 private struct HeroArtwork: View {
-    let record: RecordCard
+    let record: Record
 
     var body: some View {
         ZStack {
@@ -409,8 +405,8 @@ private struct HeroArtwork: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color(hue: record.hue, saturation: 0.35, brightness: 1.0),
-                            Color(hue: record.hue, saturation: 0.56, brightness: 0.22)
+                            Color(hue: record.artworkHue, saturation: 0.35, brightness: 1.0),
+                            Color(hue: record.artworkHue, saturation: 0.56, brightness: 0.22)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -457,13 +453,13 @@ private struct QuickActions: View {
 }
 
 private struct Timeline: View {
-    let record: RecordCard
+    let record: Record
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            timelineRow(label: "Added", value: "Mar 20, 2026")
-            timelineRow(label: "Updated", value: "Today")
-            timelineRow(label: "Sync Status", value: record.needsSync ? "Pending" : "Synced")
+            timelineRow(label: "Added", value: record.createdAt.timelineLabel)
+            timelineRow(label: "Updated", value: record.updatedAt.timelineLabel)
+            timelineRow(label: "Sync Status", value: record.syncStatus.displayTitle)
         }
         .padding(CrateSpacing.l)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -483,6 +479,34 @@ private struct Timeline: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(CrateColor.primary)
         }
+    }
+}
+
+private struct EmptyCollectionView: View {
+    let isFiltered: Bool
+    let hasError: Bool
+
+    var body: some View {
+        VStack(spacing: CrateSpacing.m) {
+            Image(systemName: hasError ? "exclamationmark.triangle" : "square.stack.3d.up.slash")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundStyle(CrateColor.accent)
+            Text(hasError ? "Collection unavailable" : (isFiltered ? "No matching records" : "Collection is empty"))
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(CrateColor.primary)
+            Text(hasError ? "Database bootstrap failed. Check the current error state and retry." : "Your local library will appear here as soon as records are stored offline.")
+                .font(.footnote)
+                .foregroundStyle(CrateColor.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 56)
+        .padding(.horizontal, CrateSpacing.l)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(.white.opacity(0.12), lineWidth: 0.8)
+        )
     }
 }
 
@@ -544,7 +568,51 @@ private struct DetailNavigationStyling: ViewModifier {
     }
 }
 
+private extension Record {
+    var artworkHue: Double {
+        Double(abs(title.hashValue ^ artist.hashValue) % 100) / 100
+    }
+
+    var metadataLine: String {
+        if let year {
+            "\(artist) • \(year)"
+        } else {
+            artist
+        }
+    }
+
+    var detailLine: String {
+        let yearText = year.map(String.init) ?? "Unknown year"
+        let conditionText = condition?.rawValue ?? "Unrated"
+        return "\(yearText) • Condition \(conditionText)"
+    }
+}
+
+private extension SyncStatus {
+    var displayTitle: String {
+        switch self {
+        case .pending:
+            "Pending"
+        case .syncing:
+            "Syncing"
+        case .synced:
+            "Synced"
+        case .failed:
+            "Failed"
+        }
+    }
+}
+
+private extension Date {
+    var timelineLabel: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: self)
+    }
+}
+
 #Preview {
-    ContentView()
+    ContentView(store: AppContainer().makeCollectionStore())
         .preferredColorScheme(.dark)
 }

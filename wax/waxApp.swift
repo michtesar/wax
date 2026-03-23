@@ -9,9 +9,18 @@ import SwiftUI
 
 @main
 struct waxApp: App {
+    private let container: AppContainer
+    @StateObject private var store: CollectionStore
+
+    init() {
+        let container = AppContainer()
+        self.container = container
+        _store = StateObject(wrappedValue: container.makeCollectionStore())
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(store: store)
                 .preferredColorScheme(.dark)
         }
     }
