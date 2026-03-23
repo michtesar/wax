@@ -37,6 +37,10 @@ struct ContentView: View {
                 ScrollView {
                     VStack(spacing: CrateSpacing.l) {
                         Color.clear.frame(height: 88)
+                        if let bootstrapStatusMessage = store.bootstrapStatusMessage {
+                            BootstrapModeBanner(message: bootstrapStatusMessage)
+                                .padding(.horizontal, CrateSpacing.l)
+                        }
                         FilterPills(selected: $selectedFilter)
                             .padding(.horizontal, CrateSpacing.l)
                         if filteredRecords.isEmpty, store.hasLoaded {
@@ -479,6 +483,29 @@ private struct Timeline: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(CrateColor.primary)
         }
+    }
+}
+
+private struct BootstrapModeBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: CrateSpacing.s) {
+            Image(systemName: "shippingbox")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(CrateColor.accent)
+            Text(message)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(CrateColor.primary)
+            Spacer()
+        }
+        .padding(.horizontal, CrateSpacing.m)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(0.12), lineWidth: 0.8)
+        )
     }
 }
 

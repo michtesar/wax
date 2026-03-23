@@ -19,7 +19,8 @@ struct CollectionStoreTests {
         repository.fetchResult = [expected]
         let store = CollectionStore(
             databaseManager: manager,
-            recordRepository: repository
+            recordRepository: repository,
+            bootstrapMode: .developmentSeed
         )
 
         await store.bootstrap()
@@ -28,6 +29,7 @@ struct CollectionStoreTests {
         #expect(repository.fetchCallCount == 1)
         #expect(store.records == [expected])
         #expect(store.errorMessage == nil)
+        #expect(store.bootstrapStatusMessage == "Fake seed loaded for local development.")
         #expect(store.hasLoaded)
         #expect(!store.isLoading)
     }
@@ -39,13 +41,15 @@ struct CollectionStoreTests {
         repository.fetchError = TestFailure.expected
         let store = CollectionStore(
             databaseManager: manager,
-            recordRepository: repository
+            recordRepository: repository,
+            bootstrapMode: .discogs(DiscogsBootstrapRequest(username: "michael"))
         )
 
         await store.bootstrap()
 
         #expect(store.records.isEmpty)
         #expect(store.errorMessage == TestFailure.expected.localizedDescription)
+        #expect(store.bootstrapStatusMessage == nil)
         #expect(store.hasLoaded)
     }
 

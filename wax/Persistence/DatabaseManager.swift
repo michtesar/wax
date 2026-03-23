@@ -1,16 +1,19 @@
 import Foundation
 import GRDB
 
-struct DatabaseConfiguration: Sendable {
+struct DatabaseConfiguration: Equatable, Sendable {
     let sqliteFileName: String
     let enablesDevelopmentSeed: Bool
+    let resetsDatabaseOnLaunch: Bool
 
     nonisolated init(
         sqliteFileName: String = "wax.sqlite",
-        enablesDevelopmentSeed: Bool = false
+        enablesDevelopmentSeed: Bool = false,
+        resetsDatabaseOnLaunch: Bool = false
     ) {
         self.sqliteFileName = sqliteFileName
         self.enablesDevelopmentSeed = enablesDevelopmentSeed
+        self.resetsDatabaseOnLaunch = resetsDatabaseOnLaunch
     }
 
     nonisolated func databaseURL(fileManager: FileManager = .default) throws -> URL {
@@ -65,6 +68,10 @@ final class GRDBDatabaseManager: DatabaseManaging, @unchecked Sendable {
     func prepareDatabase() async throws {
         if databaseQueue != nil {
             return
+        }
+
+        if configuration.resetsDatabaseOnLaunch {
+            try resetDatabaseFiles()
         }
 
         let queue = try DatabaseQueue(path: databasePath())
@@ -123,5 +130,18 @@ final class GRDBDatabaseManager: DatabaseManaging, @unchecked Sendable {
     private func databasePath() throws -> String {
         let url = try configuration.databaseURL()
         return url.path(percentEncoded: false)
+    }
+
+    private func resetDatabaseFiles(fileManager: FileManager = .default) throws {
+        let url = try configuration.databaseURL(fileManager: fileManager)
+        let sidecarURLs = [
+            url,
+            url.appendingPathExtension("shm"),
+            url.appendingPathExtension("wal")
+        ]
+
+        for sidecarURL in sidecarURLs where fileManager.fileExists(atPath: sidecarURL.path(percentEncoded: false)) {
+            try fileManager.removeItem(at: sidecarURL)
+        }
     }
 }

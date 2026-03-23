@@ -38,4 +38,17 @@ final class waxUITests: XCTestCase {
 
         XCTAssertEqual(app.state, .runningForeground)
     }
+
+    @MainActor
+    func testLaunchWithFakeSeedShowsSeededCollection() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "--bootstrap-mode=fake-seed",
+            "--reset-database",
+            "--sqlite-file-name=ui-fake-seed.sqlite"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Fake seed loaded for local development."].waitForExistence(timeout: 5))
+    }
 }
