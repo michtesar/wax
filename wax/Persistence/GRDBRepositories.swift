@@ -11,7 +11,7 @@ enum GRDBRepositoryError: Error {
     case invalidDate(String)
 }
 
-actor GRDBRecordRepository: RecordRepository {
+final class GRDBRecordRepository: RecordRepository, @unchecked Sendable {
     private let databaseManager: GRDBDatabaseManager
 
     nonisolated init(databaseManager: GRDBDatabaseManager) {
@@ -181,7 +181,7 @@ actor GRDBRecordRepository: RecordRepository {
     }
 }
 
-actor GRDBCollectionRepository: CollectionRepository {
+final class GRDBCollectionRepository: CollectionRepository, @unchecked Sendable {
     private let databaseManager: GRDBDatabaseManager
 
     nonisolated init(databaseManager: GRDBDatabaseManager) {

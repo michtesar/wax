@@ -53,18 +53,13 @@ struct DatabaseBootstrapPlan: Sendable {
     }
 }
 
-actor GRDBDatabaseManager: DatabaseManaging {
-    nonisolated let configuration: DatabaseConfiguration
+final class GRDBDatabaseManager: DatabaseManaging, @unchecked Sendable {
+    let configuration: DatabaseConfiguration
 
-    private let fileManager: FileManager
     private var databaseQueue: DatabaseQueue?
 
-    nonisolated init(
-        configuration: DatabaseConfiguration = DatabaseConfiguration(),
-        fileManager: FileManager = .default
-    ) {
+    nonisolated init(configuration: DatabaseConfiguration = DatabaseConfiguration()) {
         self.configuration = configuration
-        self.fileManager = fileManager
     }
 
     func prepareDatabase() async throws {
@@ -126,7 +121,7 @@ actor GRDBDatabaseManager: DatabaseManaging {
     }
 
     private func databasePath() throws -> String {
-        let url = try configuration.databaseURL(fileManager: fileManager)
+        let url = try configuration.databaseURL()
         return url.path(percentEncoded: false)
     }
 }
