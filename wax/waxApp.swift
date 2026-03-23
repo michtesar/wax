@@ -10,17 +10,20 @@ import SwiftUI
 @main
 struct waxApp: App {
     private let container: AppContainer
+    @StateObject private var authStore: DiscogsAuthStore
     @StateObject private var store: CollectionStore
 
     init() {
         let container = AppContainer.live()
+        let stores = container.makeStores()
         self.container = container
-        _store = StateObject(wrappedValue: container.makeCollectionStore())
+        _authStore = StateObject(wrappedValue: stores.authStore)
+        _store = StateObject(wrappedValue: stores.collectionStore)
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView(store: store)
+            ContentView(store: store, authStore: authStore)
                 .preferredColorScheme(.dark)
         }
     }

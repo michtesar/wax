@@ -102,12 +102,32 @@ struct AppContainer: Sendable {
     let launchConfiguration: AppLaunchConfiguration
     let databaseManager: GRDBDatabaseManager
     let database: DatabaseContainer
+    let authStore: DiscogsAuthStore
 
     init(launchConfiguration: AppLaunchConfiguration = .live()) {
         self.launchConfiguration = launchConfiguration
         let databaseManager = GRDBDatabaseManager(configuration: launchConfiguration.databaseConfiguration)
+        let authClient = DiscogsAuthConfiguration.live().map { configuration in
+            DiscogsOAuthClient(configuration: configuration)
+        }
         self.databaseManager = databaseManager
         self.database = DatabaseContainer(databaseManager: databaseManager)
+        self.authStore = DiscogsAuthStore(
+            authClient: authClient,
+            credentialStore: KeychainDiscogsCredentialStore()
+        )
+    }
+
+    @MainActor
+    func makeStores() -> AppStores {
+        AppStores(
+            authStore: authStore,
+            collectionStore: CollectionStore(
+                databaseManager: databaseManager,
+                recordRepository: database.records,
+                bootstrapMode: launchConfiguration.bootstrapMode
+            )
+        )
     }
 
     @MainActor
@@ -122,6 +142,12 @@ struct AppContainer: Sendable {
     static func live() -> AppContainer {
         AppContainer(launchConfiguration: .live())
     }
+}
+
+@MainActor
+struct AppStores {
+    let authStore: DiscogsAuthStore
+    let collectionStore: CollectionStore
 }
 
 @MainActor

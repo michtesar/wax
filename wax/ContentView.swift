@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 #if os(iOS)
 import UIKit
@@ -5,6 +6,8 @@ import UIKit
 
 struct ContentView: View {
     @ObservedObject var store: CollectionStore
+    @ObservedObject var authStore: DiscogsAuthStore
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     @State private var gridColumns = 2
     @State private var selectedFilter: CollectionFilter = .all
     @State private var searchPresented = false
@@ -28,6 +31,15 @@ struct ContentView: View {
         store.records.filter { $0.syncStatus == .synced }.count
     }
 
+    private var authMessage: String? {
+        switch authStore.sessionState {
+        case .unavailable:
+            return "Add Discogs consumer key and secret to enable sign-in."
+        default:
+            return authStore.errorMessage
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -39,6 +51,10 @@ struct ContentView: View {
                         Color.clear.frame(height: 88)
                         if let bootstrapStatusMessage = store.bootstrapStatusMessage {
                             BootstrapModeBanner(message: bootstrapStatusMessage)
+                                .padding(.horizontal, CrateSpacing.l)
+                        }
+                        if let authMessage {
+                            BootstrapModeBanner(message: authMessage)
                                 .padding(.horizontal, CrateSpacing.l)
                         }
                         FilterPills(selected: $selectedFilter)
@@ -76,7 +92,9 @@ struct ContentView: View {
                     title: "Collection",
                     totalCount: store.records.count,
                     syncedCount: syncedCount,
-                    onSearchTap: { searchPresented = true }
+                    authState: authStore.sessionState,
+                    onSearchTap: { searchPresented = true },
+                    onAuthTap: { handleAuthTap() }
                 )
             }
             .overlay(alignment: .bottomTrailing) {
@@ -92,6 +110,7 @@ struct ContentView: View {
             .modifier(HideNavigationBarOnIOS())
             .task {
                 await store.bootstrap()
+                await authStore.restoreSession()
             }
             .refreshable {
                 await store.reload()
@@ -108,6 +127,26 @@ struct ContentView: View {
         }
         if previous != gridColumns {
             Haptics.light()
+        }
+    }
+
+    private func handleAuthTap() {
+        Haptics.light()
+        switch authStore.sessionState {
+        case .signedIn:
+            authStore.signOut()
+        case .authorizing:
+            break
+        case .signedOut, .unavailable:
+            Task {
+                await authStore.signIn { url, callbackScheme in
+                    try await webAuthenticationSession.authenticate(
+                        using: url,
+                        callbackURLScheme: callbackScheme,
+                        preferredBrowserSession: .ephemeral
+                    )
+                }
+            }
         }
     }
 }
@@ -168,7 +207,9 @@ private struct GlassTopBar: View {
     let title: String
     let totalCount: Int
     let syncedCount: Int
+    let authState: DiscogsAuthStore.SessionState
     let onSearchTap: () -> Void
+    let onAuthTap: () -> Void
 
     var body: some View {
         VStack(spacing: CrateSpacing.s) {
@@ -177,6 +218,10 @@ private struct GlassTopBar: View {
                     .font(.system(.largeTitle, design: .default, weight: .bold))
                     .foregroundStyle(CrateColor.primary)
                 Spacer()
+                Button(action: onAuthTap) {
+                    AuthBadge(authState: authState)
+                }
+                .buttonStyle(.plain)
                 Button(action: onSearchTap) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .semibold))
@@ -210,6 +255,74 @@ private struct GlassTopBar: View {
                 .frame(height: 0.5),
             alignment: .bottom
         )
+    }
+}
+
+private struct AuthBadge: View {
+    let authState: DiscogsAuthStore.SessionState
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: iconName)
+                .font(.system(size: 12, weight: .semibold))
+            Text(title)
+                .font(.footnote.weight(.semibold))
+        }
+        .foregroundStyle(foregroundStyle)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(backgroundStyle, in: Capsule())
+        .overlay(
+            Capsule().stroke(.white.opacity(0.12), lineWidth: 0.8)
+        )
+    }
+
+    private var iconName: String {
+        switch authState {
+        case .unavailable:
+            "lock.slash"
+        case .signedOut:
+            "person.crop.circle.badge.plus"
+        case .authorizing:
+            "ellipsis.circle"
+        case .signedIn:
+            "checkmark.seal"
+        }
+    }
+
+    private var title: String {
+        switch authState {
+        case .unavailable:
+            "Discogs Off"
+        case .signedOut:
+            "Sign In"
+        case .authorizing:
+            "Connecting"
+        case let .signedIn(username):
+            username
+        }
+    }
+
+    private var foregroundStyle: Color {
+        switch authState {
+        case .signedIn:
+            CrateColor.primary
+        case .unavailable:
+            CrateColor.secondary
+        case .signedOut, .authorizing:
+            CrateColor.primary
+        }
+    }
+
+    private var backgroundStyle: Color {
+        switch authState {
+        case .signedIn:
+            CrateColor.accent.opacity(0.26)
+        case .unavailable:
+            .white.opacity(0.06)
+        case .signedOut, .authorizing:
+            .white.opacity(0.10)
+        }
     }
 }
 
@@ -640,6 +753,18 @@ private extension Date {
 }
 
 #Preview {
-    ContentView(store: AppContainer().makeCollectionStore())
+    ContentView(
+        store: AppContainer().makeCollectionStore(),
+        authStore: DiscogsAuthStore(
+            authClient: nil,
+            credentialStore: PreviewCredentialStore()
+        )
+    )
         .preferredColorScheme(.dark)
+}
+
+private struct PreviewCredentialStore: DiscogsCredentialStoring {
+    func loadCredentials() throws -> DiscogsCredentials? { nil }
+    func saveCredentials(_ credentials: DiscogsCredentials) throws {}
+    func clearCredentials() throws {}
 }

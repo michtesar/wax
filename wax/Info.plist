@@ -2,6 +2,27 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.michaeltesar.wax.discogs</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>wax</string>
+			</array>
+		</dict>
+	</array>
+	<key>DiscogsCallbackScheme</key>
+	<string>wax</string>
+	<key>DiscogsCallbackURL</key>
+	<string>wax://discogs/auth</string>
+	<key>DiscogsConsumerKey</key>
+	<string></string>
+	<key>DiscogsConsumerSecret</key>
+	<string></string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
