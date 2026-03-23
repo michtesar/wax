@@ -1,17 +1,17 @@
 import Foundation
 
 struct Record: Identifiable, Hashable, Codable, Sendable {
-    let id: UUID
-    let discogsID: Int?
-    var title: String
-    var artist: String
-    var year: Int?
-    var format: String?
-    var notes: String
-    var condition: RecordCondition?
-    var syncStatus: SyncStatus
-    var createdAt: Date
-    var updatedAt: Date
+    nonisolated let id: UUID
+    nonisolated let discogsID: Int?
+    nonisolated var title: String
+    nonisolated var artist: String
+    nonisolated var year: Int?
+    nonisolated var format: String?
+    nonisolated var notes: String
+    nonisolated var condition: RecordCondition?
+    nonisolated var syncStatus: SyncStatus
+    nonisolated var createdAt: Date
+    nonisolated var updatedAt: Date
 
     nonisolated init(
         id: UUID = UUID(),
@@ -41,15 +41,15 @@ struct Record: Identifiable, Hashable, Codable, Sendable {
 }
 
 struct CollectionEntry: Identifiable, Hashable, Codable, Sendable {
-    let id: UUID
-    let recordID: UUID
-    let discogsInstanceID: Int?
-    var folderID: Int?
-    var dateAdded: Date?
-    var sortPosition: Int?
-    var syncStatus: SyncStatus
-    var createdAt: Date
-    var updatedAt: Date
+    nonisolated let id: UUID
+    nonisolated let recordID: UUID
+    nonisolated let discogsInstanceID: Int?
+    nonisolated var folderID: Int?
+    nonisolated var dateAdded: Date?
+    nonisolated var sortPosition: Int?
+    nonisolated var syncStatus: SyncStatus
+    nonisolated var createdAt: Date
+    nonisolated var updatedAt: Date
 
     nonisolated init(
         id: UUID = UUID(),
@@ -75,17 +75,17 @@ struct CollectionEntry: Identifiable, Hashable, Codable, Sendable {
 }
 
 struct SyncOperation: Identifiable, Hashable, Codable, Sendable {
-    let id: UUID
-    let entityType: SyncEntityType
-    let entityID: UUID
-    var operationType: SyncOperationType
-    var payload: Data?
-    var state: SyncOperationState
-    var attemptCount: Int
-    var nextAttemptAt: Date?
-    var lastErrorMessage: String?
-    var createdAt: Date
-    var updatedAt: Date
+    nonisolated let id: UUID
+    nonisolated let entityType: SyncEntityType
+    nonisolated let entityID: UUID
+    nonisolated var operationType: SyncOperationType
+    nonisolated var payload: Data?
+    nonisolated var state: SyncOperationState
+    nonisolated var attemptCount: Int
+    nonisolated var nextAttemptAt: Date?
+    nonisolated var lastErrorMessage: String?
+    nonisolated var createdAt: Date
+    nonisolated var updatedAt: Date
 
     nonisolated init(
         id: UUID = UUID(),
@@ -115,12 +115,12 @@ struct SyncOperation: Identifiable, Hashable, Codable, Sendable {
 }
 
 struct SyncCheckpoint: Identifiable, Hashable, Codable, Sendable {
-    let id: UUID
-    var scope: SyncScope
-    var cursor: String?
-    var lastSyncedAt: Date?
-    var createdAt: Date
-    var updatedAt: Date
+    nonisolated let id: UUID
+    nonisolated var scope: SyncScope
+    nonisolated var cursor: String?
+    nonisolated var lastSyncedAt: Date?
+    nonisolated var createdAt: Date
+    nonisolated var updatedAt: Date
 
     nonisolated init(
         id: UUID = UUID(),
@@ -140,17 +140,17 @@ struct SyncCheckpoint: Identifiable, Hashable, Codable, Sendable {
 }
 
 struct ImageAsset: Identifiable, Hashable, Codable, Sendable {
-    let id: UUID
-    let recordID: UUID
-    var discogsImageURL: URL?
-    var thumbnailLocalPath: String?
-    var fullsizeLocalPath: String?
-    var pixelWidth: Int?
-    var pixelHeight: Int?
-    var byteSize: Int64?
-    var lastAccessedAt: Date?
-    var createdAt: Date
-    var updatedAt: Date
+    nonisolated let id: UUID
+    nonisolated let recordID: UUID
+    nonisolated var discogsImageURL: URL?
+    nonisolated var thumbnailLocalPath: String?
+    nonisolated var fullsizeLocalPath: String?
+    nonisolated var pixelWidth: Int?
+    nonisolated var pixelHeight: Int?
+    nonisolated var byteSize: Int64?
+    nonisolated var lastAccessedAt: Date?
+    nonisolated var createdAt: Date
+    nonisolated var updatedAt: Date
 
     nonisolated init(
         id: UUID = UUID(),

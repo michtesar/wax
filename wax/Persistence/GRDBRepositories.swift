@@ -14,7 +14,7 @@ enum GRDBRepositoryError: Error {
 actor GRDBRecordRepository: RecordRepository {
     private let databaseManager: GRDBDatabaseManager
 
-    init(databaseManager: GRDBDatabaseManager) {
+    nonisolated init(databaseManager: GRDBDatabaseManager) {
         self.databaseManager = databaseManager
     }
 
@@ -184,7 +184,7 @@ actor GRDBRecordRepository: RecordRepository {
 actor GRDBCollectionRepository: CollectionRepository {
     private let databaseManager: GRDBDatabaseManager
 
-    init(databaseManager: GRDBDatabaseManager) {
+    nonisolated init(databaseManager: GRDBDatabaseManager) {
         self.databaseManager = databaseManager
     }
 

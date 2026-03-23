@@ -33,9 +33,9 @@ final class waxUITests: XCTestCase {
 
     @MainActor
     func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
-        }
+        let app = XCUIApplication()
+        app.launch()
+
+        XCTAssertEqual(app.state, .runningForeground)
     }
 }

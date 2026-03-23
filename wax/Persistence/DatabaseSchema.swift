@@ -1,12 +1,12 @@
 import Foundation
 
 struct DatabaseMigration: Identifiable, Hashable, Sendable {
-    let id: String
-    let statements: [String]
+    nonisolated let id: String
+    nonisolated let statements: [String]
 }
 
 enum DatabaseSchema {
-    static let migrations: [DatabaseMigration] = [
+    nonisolated static let migrations: [DatabaseMigration] = [
         DatabaseMigration(
             id: "20260323_001_create_record_collection_sync_tables",
             statements: [
@@ -93,7 +93,7 @@ enum DatabaseSchema {
         )
     ]
 
-    static let developmentSeedStatements: [String] = [
+    nonisolated static let developmentSeedStatements: [String] = [
         """
         INSERT OR IGNORE INTO sync_checkpoint (
             id,
@@ -113,7 +113,7 @@ enum DatabaseSchema {
         """
     ]
 
-    static let rollbackStrategy = """
+    nonisolated static let rollbackStrategy = """
     Rollback policy:
     - production uses forward-only migrations
     - failed startup migration aborts database open and surfaces a fatal persistence error

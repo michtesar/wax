@@ -5,7 +5,7 @@ struct DatabaseConfiguration: Sendable {
     let sqliteFileName: String
     let enablesDevelopmentSeed: Bool
 
-    init(
+    nonisolated init(
         sqliteFileName: String = "wax.sqlite",
         enablesDevelopmentSeed: Bool = false
     ) {
@@ -40,11 +40,11 @@ protocol DatabaseManaging: Sendable {
 }
 
 struct DatabaseBootstrapPlan: Sendable {
-    let configuration: DatabaseConfiguration
-    let migrations: [DatabaseMigration]
-    let developmentSeedStatements: [String]
+    nonisolated let configuration: DatabaseConfiguration
+    nonisolated let migrations: [DatabaseMigration]
+    nonisolated let developmentSeedStatements: [String]
 
-    init(configuration: DatabaseConfiguration) {
+    nonisolated init(configuration: DatabaseConfiguration) {
         self.configuration = configuration
         self.migrations = DatabaseSchema.migrations
         self.developmentSeedStatements = configuration.enablesDevelopmentSeed
@@ -54,12 +54,12 @@ struct DatabaseBootstrapPlan: Sendable {
 }
 
 actor GRDBDatabaseManager: DatabaseManaging {
-    let configuration: DatabaseConfiguration
+    nonisolated let configuration: DatabaseConfiguration
 
     private let fileManager: FileManager
     private var databaseQueue: DatabaseQueue?
 
-    init(
+    nonisolated init(
         configuration: DatabaseConfiguration = DatabaseConfiguration(),
         fileManager: FileManager = .default
     ) {
