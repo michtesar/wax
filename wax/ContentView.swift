@@ -64,9 +64,15 @@ struct ContentView: View {
                             LazyVGrid(columns: columns, spacing: CrateSpacing.l) {
                                 ForEach(filteredRecords) { record in
                                     NavigationLink {
-                                        RecordDetailView(record: record)
+                                        RecordDetailView(
+                                            record: record,
+                                            artworkURL: store.artworkURL(for: record.id)
+                                        )
                                     } label: {
-                                        ArtworkCard(record: record)
+                                        ArtworkCard(
+                                            record: record,
+                                            artworkURL: store.artworkURL(for: record.id)
+                                        )
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -363,31 +369,12 @@ private struct FilterPills: View {
 
 private struct ArtworkCard: View {
     let record: Record
+    let artworkURL: URL?
 
     var body: some View {
         VStack(alignment: .leading, spacing: CrateSpacing.s) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(hue: record.artworkHue, saturation: 0.45, brightness: 0.95),
-                                Color(hue: record.artworkHue, saturation: 0.55, brightness: 0.30)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(.white.opacity(0.45), lineWidth: 2)
-                            .padding(28)
-                    )
-                    .overlay(
-                        Circle()
-                            .fill(.black.opacity(0.35))
-                            .frame(width: 20, height: 20)
-                    )
+                RecordArtwork(record: record, artworkURL: artworkURL, cornerRadius: 16)
                 if record.syncStatus != .synced {
                     VStack {
                         HStack {
@@ -486,6 +473,7 @@ private struct SearchSheet: View {
 
 private struct RecordDetailView: View {
     let record: Record
+    let artworkURL: URL?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -493,7 +481,7 @@ private struct RecordDetailView: View {
             CrateBackgroundGlow()
             ScrollView {
                 VStack(alignment: .leading, spacing: CrateSpacing.xl) {
-                    HeroArtwork(record: record)
+                    HeroArtwork(record: record, artworkURL: artworkURL)
                         .padding(.top, 12)
                     VStack(alignment: .leading, spacing: CrateSpacing.s) {
                         Text(record.title)
@@ -519,29 +507,67 @@ private struct RecordDetailView: View {
 
 private struct HeroArtwork: View {
     let record: Record
+    let artworkURL: URL?
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(hue: record.artworkHue, saturation: 0.35, brightness: 1.0),
-                            Color(hue: record.artworkHue, saturation: 0.56, brightness: 0.22)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            RecordArtwork(record: record, artworkURL: artworkURL, cornerRadius: 24)
                 .aspectRatio(1, contentMode: .fit)
-                .overlay(Circle().stroke(.white.opacity(0.40), lineWidth: 3).padding(34))
-                .overlay(Circle().fill(.black.opacity(0.35)).frame(width: 24, height: 24))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(.white.opacity(0.15), lineWidth: 1)
-                )
         }
         .shadow(color: .black.opacity(0.35), radius: 24, x: 0, y: 10)
+    }
+}
+
+private struct RecordArtwork: View {
+    let record: Record
+    let artworkURL: URL?
+    let cornerRadius: CGFloat
+
+    var body: some View {
+        ZStack {
+            placeholder
+            if let artworkURL {
+                AsyncImage(url: artworkURL, transaction: Transaction(animation: .easeInOut(duration: 0.2))) { phase in
+                    switch phase {
+                    case let .success(image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        Color.clear
+                    }
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(.white.opacity(0.15), lineWidth: 1)
+        )
+    }
+
+    private var placeholder: some View {
+        RoundedRectangle(cornerRadius: cornerRadius)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color(hue: record.artworkHue, saturation: 0.45, brightness: 0.95),
+                        Color(hue: record.artworkHue, saturation: 0.55, brightness: 0.30)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                Circle()
+                    .stroke(.white.opacity(0.45), lineWidth: cornerRadius > 20 ? 3 : 2)
+                    .padding(cornerRadius > 20 ? 34 : 28)
+            )
+            .overlay(
+                Circle()
+                    .fill(.black.opacity(0.35))
+                    .frame(width: cornerRadius > 20 ? 24 : 20, height: cornerRadius > 20 ? 24 : 20)
+            )
     }
 }
 

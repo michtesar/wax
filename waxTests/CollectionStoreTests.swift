@@ -20,6 +20,7 @@ struct CollectionStoreTests {
         let store = CollectionStore(
             databaseManager: manager,
             recordRepository: repository,
+            imageAssetRepository: TestImageAssetRepository(),
             bootstrapMode: .developmentSeed
         )
 
@@ -42,6 +43,7 @@ struct CollectionStoreTests {
         let store = CollectionStore(
             databaseManager: manager,
             recordRepository: repository,
+            imageAssetRepository: TestImageAssetRepository(),
             bootstrapMode: .discogs(DiscogsBootstrapRequest(username: "michael"))
         )
 
@@ -74,7 +76,8 @@ struct CollectionStoreTests {
         repository.fetchResult = [first]
         let store = CollectionStore(
             databaseManager: manager,
-            recordRepository: repository
+            recordRepository: repository,
+            imageAssetRepository: TestImageAssetRepository()
         )
 
         await store.bootstrap()
@@ -127,4 +130,11 @@ private final class TestRecordRepository: RecordRepository, @unchecked Sendable 
     func updateNotes(recordID: UUID, notes: String, updatedAt: Date) async throws {}
 
     func updateCondition(recordID: UUID, condition: RecordCondition?, updatedAt: Date) async throws {}
+}
+
+private final class TestImageAssetRepository: ImageAssetRepository, @unchecked Sendable {
+    func fetchImageAsset(recordID: UUID) async throws -> ImageAsset? { nil }
+    func upsert(_ asset: ImageAsset) async throws {}
+    func markAccess(recordID: UUID, at date: Date) async throws {}
+    func deleteImageAsset(id: UUID) async throws {}
 }

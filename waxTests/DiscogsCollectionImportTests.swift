@@ -148,6 +148,7 @@ struct CollectionStoreDiscogsImportTests {
         let store = CollectionStore(
             databaseManager: manager,
             recordRepository: repository,
+            imageAssetRepository: StoreImportImageAssetRepository(),
             collectionImporter: importer
         )
 
@@ -209,6 +210,13 @@ private final class StoreImportRecordRepository: RecordRepository, @unchecked Se
     func deleteRecord(id: UUID) async throws {}
     func updateNotes(recordID: UUID, notes: String, updatedAt: Date) async throws {}
     func updateCondition(recordID: UUID, condition: RecordCondition?, updatedAt: Date) async throws {}
+}
+
+private final class StoreImportImageAssetRepository: ImageAssetRepository, @unchecked Sendable {
+    func fetchImageAsset(recordID: UUID) async throws -> ImageAsset? { nil }
+    func upsert(_ asset: ImageAsset) async throws {}
+    func markAccess(recordID: UUID, at date: Date) async throws {}
+    func deleteImageAsset(id: UUID) async throws {}
 }
 
 private final class DiscogsImportTestHarness {

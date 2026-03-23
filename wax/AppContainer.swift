@@ -138,6 +138,7 @@ struct AppContainer: Sendable {
             collectionStore: CollectionStore(
                 databaseManager: databaseManager,
                 recordRepository: database.records,
+                imageAssetRepository: database.imageAssets,
                 collectionImporter: collectionImporter,
                 bootstrapMode: launchConfiguration.bootstrapMode
             )
@@ -149,6 +150,7 @@ struct AppContainer: Sendable {
         CollectionStore(
             databaseManager: databaseManager,
             recordRepository: database.records,
+            imageAssetRepository: database.imageAssets,
             collectionImporter: collectionImporter,
             bootstrapMode: launchConfiguration.bootstrapMode
         )
@@ -168,6 +170,7 @@ struct AppStores {
 @MainActor
 final class CollectionStore: ObservableObject {
     @Published private(set) var records: [Record] = []
+    @Published private(set) var artworkURLsByRecordID: [UUID: URL] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var hasLoaded = false
     @Published var errorMessage: String?
@@ -175,17 +178,20 @@ final class CollectionStore: ObservableObject {
 
     private let databaseManager: any DatabaseManaging
     private let recordRepository: any RecordRepository
+    private let imageAssetRepository: any ImageAssetRepository
     private let collectionImporter: (any DiscogsCollectionImporting)?
     private let bootstrapMode: CollectionBootstrapMode
 
     init(
         databaseManager: any DatabaseManaging,
         recordRepository: any RecordRepository,
+        imageAssetRepository: any ImageAssetRepository,
         collectionImporter: (any DiscogsCollectionImporting)? = nil,
         bootstrapMode: CollectionBootstrapMode = .localOnly
     ) {
         self.databaseManager = databaseManager
         self.recordRepository = recordRepository
+        self.imageAssetRepository = imageAssetRepository
         self.collectionImporter = collectionImporter
         self.bootstrapMode = bootstrapMode
     }
@@ -204,6 +210,7 @@ final class CollectionStore: ObservableObject {
         do {
             try await databaseManager.prepareDatabase()
             records = try await recordRepository.fetchRecords(matching: RecordListQuery(limit: 200))
+            artworkURLsByRecordID = try await loadArtworkURLs(for: records)
             errorMessage = nil
             bootstrapStatusMessage = bootstrapStatus(for: bootstrapMode, recordCount: records.count)
         } catch {
@@ -214,6 +221,7 @@ final class CollectionStore: ObservableObject {
     func reload() async {
         do {
             records = try await recordRepository.fetchRecords(matching: RecordListQuery(limit: 200))
+            artworkURLsByRecordID = try await loadArtworkURLs(for: records)
             errorMessage = nil
             bootstrapStatusMessage = bootstrapStatus(for: bootstrapMode, recordCount: records.count)
         } catch {
@@ -235,11 +243,16 @@ final class CollectionStore: ObservableObject {
                 credentials: credentials
             )
             records = try await recordRepository.fetchRecords(matching: RecordListQuery(limit: 200))
+            artworkURLsByRecordID = try await loadArtworkURLs(for: records)
             errorMessage = nil
             bootstrapStatusMessage = "Imported \(importedCount) records from Discogs."
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func artworkURL(for recordID: UUID) -> URL? {
+        artworkURLsByRecordID[recordID]
     }
 
     private func bootstrapStatus(
@@ -257,5 +270,16 @@ final class CollectionStore: ObservableObject {
             }
             return "Discogs bootstrap mode configured."
         }
+    }
+
+    private func loadArtworkURLs(for records: [Record]) async throws -> [UUID: URL] {
+        var result: [UUID: URL] = [:]
+        for record in records {
+            if let asset = try await imageAssetRepository.fetchImageAsset(recordID: record.id),
+               let url = asset.discogsImageURL {
+                result[record.id] = url
+            }
+        }
+        return result
     }
 }
