@@ -20,15 +20,6 @@ enum DatabaseDateCodec {
         }()
     ]
 
-    private static let sqliteTimestampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .iso8601)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter
-    }()
-
     nonisolated static func encode(_ date: Date) -> String {
         encoderFormatter.string(from: date)
     }
@@ -40,6 +31,11 @@ enum DatabaseDateCodec {
             }
         }
 
-        return sqliteTimestampFormatter.date(from: string)
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: string)
     }
 }

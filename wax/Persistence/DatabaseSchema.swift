@@ -110,6 +110,106 @@ enum DatabaseSchema {
             CURRENT_TIMESTAMP,
             CURRENT_TIMESTAMP
         );
+        """,
+        """
+        INSERT OR IGNORE INTO record (
+            id,
+            discogs_id,
+            title,
+            artist,
+            year,
+            format,
+            notes,
+            condition,
+            sync_status,
+            created_at,
+            updated_at
+        ) VALUES
+        (
+            '11111111-1111-1111-1111-111111111111',
+            249504,
+            'Moon Safari',
+            'Air',
+            1998,
+            'LP',
+            'Seeded sample record',
+            'NM',
+            'synced',
+            '2026-03-23T10:00:00.000Z',
+            '2026-03-23T10:00:00.000Z'
+        ),
+        (
+            '22222222-2222-2222-2222-222222222222',
+            91551,
+            'Discovery',
+            'Daft Punk',
+            2001,
+            '2xLP',
+            '',
+            'VG+',
+            'pending',
+            '2026-03-24T10:00:00.000Z',
+            '2026-03-24T10:00:00.000Z'
+        ),
+        (
+            '33333333-3333-3333-3333-333333333333',
+            2783,
+            'Kind of Blue',
+            'Miles Davis',
+            1959,
+            'LP',
+            'Mono pressing',
+            'VG',
+            'failed',
+            '2026-03-25T10:00:00.000Z',
+            '2026-03-25T10:00:00.000Z'
+        );
+        """,
+        """
+        INSERT OR IGNORE INTO collection_entry (
+            id,
+            record_id,
+            discogs_instance_id,
+            folder_id,
+            date_added,
+            sort_position,
+            sync_status,
+            created_at,
+            updated_at
+        ) VALUES
+        (
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            '11111111-1111-1111-1111-111111111111',
+            501,
+            1,
+            '2026-03-23T10:00:00.000Z',
+            1,
+            'synced',
+            '2026-03-23T10:00:00.000Z',
+            '2026-03-23T10:00:00.000Z'
+        ),
+        (
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            '22222222-2222-2222-2222-222222222222',
+            502,
+            1,
+            '2026-03-24T10:00:00.000Z',
+            2,
+            'pending',
+            '2026-03-24T10:00:00.000Z',
+            '2026-03-24T10:00:00.000Z'
+        ),
+        (
+            'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            '33333333-3333-3333-3333-333333333333',
+            503,
+            1,
+            '2026-03-25T10:00:00.000Z',
+            3,
+            'failed',
+            '2026-03-25T10:00:00.000Z',
+            '2026-03-25T10:00:00.000Z'
+        );
         """
     ]
 

@@ -13,7 +13,7 @@ struct waxApp: App {
     @StateObject private var store: CollectionStore
 
     init() {
-        let container = AppContainer()
+        let container = AppContainer.live()
         self.container = container
         _store = StateObject(wrappedValue: container.makeCollectionStore())
     }

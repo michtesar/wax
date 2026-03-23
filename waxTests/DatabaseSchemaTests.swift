@@ -208,6 +208,20 @@ struct DatabaseSchemaTests {
     }
 
     @Test
+    func developmentSeedInsertsSampleCollectionRecords() async throws {
+        let harness = try DatabaseTestHarness(enablesDevelopmentSeed: true)
+        let repository = GRDBRecordRepository(databaseManager: harness.manager)
+
+        try await harness.manager.prepareDatabase()
+        let records = try await repository.fetchRecords(matching: RecordListQuery(limit: 20))
+
+        #expect(records.count == 3)
+        #expect(records.map(\.title).contains("Moon Safari"))
+        #expect(records.map(\.title).contains("Discovery"))
+        #expect(records.map(\.title).contains("Kind of Blue"))
+    }
+
+    @Test
     func syncCheckpointRepositoryUpdatesExistingScope() async throws {
         let harness = try DatabaseTestHarness()
         let repository = GRDBSyncCheckpointRepository(databaseManager: harness.manager)

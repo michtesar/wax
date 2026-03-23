@@ -19,6 +19,10 @@ struct AppContainer: Sendable {
             recordRepository: database.records
         )
     }
+
+    static func live() -> AppContainer {
+        AppContainer(configuration: .live)
+    }
 }
 
 @MainActor
@@ -66,5 +70,18 @@ final class CollectionStore: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private extension DatabaseConfiguration {
+    static var live: DatabaseConfiguration {
+        let processInfo = ProcessInfo.processInfo
+        let arguments = Set(processInfo.arguments)
+        let environment = processInfo.environment
+        let enablesDevelopmentSeed =
+            arguments.contains("--seed-development-data") ||
+            environment["WAX_SEED_DEVELOPMENT_DATA"] == "1"
+
+        return DatabaseConfiguration(enablesDevelopmentSeed: enablesDevelopmentSeed)
     }
 }
