@@ -103,19 +103,32 @@ struct AppContainer: Sendable {
     let databaseManager: GRDBDatabaseManager
     let database: DatabaseContainer
     let authStore: DiscogsAuthStore
+    let collectionImporter: (any DiscogsCollectionImporting)?
 
     init(launchConfiguration: AppLaunchConfiguration = .live()) {
         self.launchConfiguration = launchConfiguration
         let databaseManager = GRDBDatabaseManager(configuration: launchConfiguration.databaseConfiguration)
-        let authClient = DiscogsAuthConfiguration.live().map { configuration in
+        let database = DatabaseContainer(databaseManager: databaseManager)
+        let authConfiguration = DiscogsAuthConfiguration.live()
+        let authClient = authConfiguration.map { configuration in
             DiscogsOAuthClient(configuration: configuration)
         }
+        let collectionImporter = authConfiguration.map { configuration in
+            DiscogsCollectionImporter(
+                apiClient: DiscogsCollectionAPIClient(configuration: configuration),
+                recordRepository: database.records,
+                collectionRepository: database.collections,
+                imageAssetRepository: database.imageAssets,
+                checkpointRepository: database.syncCheckpoints
+            )
+        }
         self.databaseManager = databaseManager
-        self.database = DatabaseContainer(databaseManager: databaseManager)
+        self.database = database
         self.authStore = DiscogsAuthStore(
             authClient: authClient,
             credentialStore: KeychainDiscogsCredentialStore()
         )
+        self.collectionImporter = collectionImporter
     }
 
     @MainActor
@@ -125,6 +138,7 @@ struct AppContainer: Sendable {
             collectionStore: CollectionStore(
                 databaseManager: databaseManager,
                 recordRepository: database.records,
+                collectionImporter: collectionImporter,
                 bootstrapMode: launchConfiguration.bootstrapMode
             )
         )
@@ -135,6 +149,7 @@ struct AppContainer: Sendable {
         CollectionStore(
             databaseManager: databaseManager,
             recordRepository: database.records,
+            collectionImporter: collectionImporter,
             bootstrapMode: launchConfiguration.bootstrapMode
         )
     }
@@ -160,15 +175,18 @@ final class CollectionStore: ObservableObject {
 
     private let databaseManager: any DatabaseManaging
     private let recordRepository: any RecordRepository
+    private let collectionImporter: (any DiscogsCollectionImporting)?
     private let bootstrapMode: CollectionBootstrapMode
 
     init(
         databaseManager: any DatabaseManaging,
         recordRepository: any RecordRepository,
+        collectionImporter: (any DiscogsCollectionImporting)? = nil,
         bootstrapMode: CollectionBootstrapMode = .localOnly
     ) {
         self.databaseManager = databaseManager
         self.recordRepository = recordRepository
+        self.collectionImporter = collectionImporter
         self.bootstrapMode = bootstrapMode
     }
 
@@ -198,6 +216,27 @@ final class CollectionStore: ObservableObject {
             records = try await recordRepository.fetchRecords(matching: RecordListQuery(limit: 200))
             errorMessage = nil
             bootstrapStatusMessage = bootstrapStatus(for: bootstrapMode, recordCount: records.count)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func importDiscogsCollection(credentials: DiscogsCredentials) async {
+        guard let collectionImporter else {
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            let importedCount = try await collectionImporter.importCollection(
+                username: credentials.username,
+                credentials: credentials
+            )
+            records = try await recordRepository.fetchRecords(matching: RecordListQuery(limit: 200))
+            errorMessage = nil
+            bootstrapStatusMessage = "Imported \(importedCount) records from Discogs."
         } catch {
             errorMessage = error.localizedDescription
         }

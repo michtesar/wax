@@ -6,6 +6,7 @@ import Testing
 struct DiscogsAuthTests {
     @Test
     func liveConfigurationReadsEnvironmentOverrides() {
+        let configurationStore = InMemoryAuthConfigurationStore()
         let configuration = DiscogsAuthConfiguration.live(
             bundle: .main,
             processInfo: TestProcessInfo(
@@ -15,23 +16,50 @@ struct DiscogsAuthTests {
                     "WAX_DISCOGS_CALLBACK_SCHEME": "wax-dev",
                     "WAX_DISCOGS_CALLBACK_URL": "wax-dev://discogs/auth"
                 ]
-            )
+            ),
+            configurationStore: configurationStore
         )
 
         #expect(configuration?.consumerKey == "consumer-key")
         #expect(configuration?.consumerSecret == "consumer-secret")
         #expect(configuration?.callbackScheme == "wax-dev")
         #expect(configuration?.callbackURL.absoluteString == "wax-dev://discogs/auth")
+        #expect(configurationStore.configuration?.consumerKey == "consumer-key")
     }
 
     @Test
     func liveConfigurationReturnsNilWithoutCredentials() {
+        let configurationStore = InMemoryAuthConfigurationStore()
         let configuration = DiscogsAuthConfiguration.live(
             bundle: .main,
-            processInfo: TestProcessInfo(environment: [:])
+            processInfo: TestProcessInfo(environment: [:]),
+            configurationStore: configurationStore
         )
 
         #expect(configuration == nil)
+    }
+
+    @Test
+    func liveConfigurationFallsBackToPersistedConfiguration() {
+        let configurationStore = InMemoryAuthConfigurationStore()
+        try? configurationStore.saveConfiguration(
+            PersistedDiscogsAuthConfiguration(
+                consumerKey: "persisted-key",
+                consumerSecret: "persisted-secret",
+                callbackScheme: "wax",
+                callbackURL: URL(string: "wax://discogs/auth")!
+            )
+        )
+
+        let configuration = DiscogsAuthConfiguration.live(
+            bundle: .main,
+            processInfo: TestProcessInfo(environment: [:]),
+            configurationStore: configurationStore
+        )
+
+        #expect(configuration?.consumerKey == "persisted-key")
+        #expect(configuration?.consumerSecret == "persisted-secret")
+        #expect(configuration?.callbackURL.absoluteString == "wax://discogs/auth")
     }
 
     @Test
@@ -230,5 +258,21 @@ private final class InMemoryCredentialStore: DiscogsCredentialStoring, @unchecke
 
     func clearCredentials() throws {
         credentials = nil
+    }
+}
+
+private final class InMemoryAuthConfigurationStore: DiscogsAuthConfigurationStoring, @unchecked Sendable {
+    var configuration: PersistedDiscogsAuthConfiguration?
+
+    func loadConfiguration() throws -> PersistedDiscogsAuthConfiguration? {
+        configuration
+    }
+
+    func saveConfiguration(_ configuration: PersistedDiscogsAuthConfiguration) throws {
+        self.configuration = configuration
+    }
+
+    func clearConfiguration() throws {
+        configuration = nil
     }
 }

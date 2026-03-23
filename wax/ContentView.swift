@@ -106,9 +106,15 @@ struct ContentView: View {
             .task {
                 await store.bootstrap()
                 await authStore.restoreSession()
+                if let credentials = authStore.credentials {
+                    await store.importDiscogsCollection(credentials: credentials)
+                }
             }
             .refreshable {
                 await store.reload()
+                if let credentials = authStore.credentials {
+                    await store.importDiscogsCollection(credentials: credentials)
+                }
             }
         }
     }
@@ -140,6 +146,9 @@ struct ContentView: View {
                         callbackURLScheme: callbackScheme,
                         preferredBrowserSession: .ephemeral
                     )
+                }
+                if let credentials = authStore.credentials {
+                    await store.importDiscogsCollection(credentials: credentials)
                 }
             }
         }

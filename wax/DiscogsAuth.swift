@@ -10,37 +10,11 @@ protocol _DiscogsProcessInfo {
 
 extension ProcessInfo: _DiscogsProcessInfo {}
 
-private enum DiscogsAuthDebugLogger {
-    static func logConfigurationProbe(
-        consumerKey: String?,
-        consumerSecret: String?,
-        callbackScheme: String?,
-        callbackURLString: String?
-    ) {
-#if DEBUG
-        let keyPresent = !(consumerKey?.isEmpty ?? true)
-        let secretPresent = !(consumerSecret?.isEmpty ?? true)
-        let sanitizedKeyPreview: String
-        if let consumerKey, consumerKey.count >= 4 {
-            sanitizedKeyPreview = String(consumerKey.prefix(4)) + "..."
-        } else if let consumerKey, !consumerKey.isEmpty {
-            sanitizedKeyPreview = consumerKey
-        } else {
-            sanitizedKeyPreview = "<missing>"
-        }
-
-        print(
-            """
-            [DiscogsAuth] Config probe:
-              consumerKeyPresent=\(keyPresent)
-              consumerKeyPreview=\(sanitizedKeyPreview)
-              consumerSecretPresent=\(secretPresent)
-              callbackScheme=\(callbackScheme ?? "<nil>")
-              callbackURL=\(callbackURLString ?? "<nil>")
-            """
-        )
-#endif
-    }
+struct PersistedDiscogsAuthConfiguration: Codable, Equatable, Sendable {
+    let consumerKey: String
+    let consumerSecret: String
+    let callbackScheme: String
+    let callbackURL: URL
 }
 
 struct DiscogsAuthConfiguration: Sendable {
@@ -66,26 +40,25 @@ struct DiscogsAuthConfiguration: Sendable {
 
     static func live(
         bundle: Bundle = .main,
-        processInfo: any _DiscogsProcessInfo = ProcessInfo.processInfo
+        processInfo: any _DiscogsProcessInfo = ProcessInfo.processInfo,
+        configurationStore: any DiscogsAuthConfigurationStoring = KeychainDiscogsAuthConfigurationStore()
     ) -> DiscogsAuthConfiguration? {
         let environment = processInfo.environment
+        let persistedConfiguration = try? configurationStore.loadConfiguration()
         let consumerKey = environment["WAX_DISCOGS_CONSUMER_KEY"]
             ?? bundle.object(forInfoDictionaryKey: "DiscogsConsumerKey") as? String
+            ?? persistedConfiguration?.consumerKey
         let consumerSecret = environment["WAX_DISCOGS_CONSUMER_SECRET"]
             ?? bundle.object(forInfoDictionaryKey: "DiscogsConsumerSecret") as? String
+            ?? persistedConfiguration?.consumerSecret
         let callbackScheme = environment["WAX_DISCOGS_CALLBACK_SCHEME"]
             ?? bundle.object(forInfoDictionaryKey: "DiscogsCallbackScheme") as? String
+            ?? persistedConfiguration?.callbackScheme
             ?? "wax"
         let callbackURLString = environment["WAX_DISCOGS_CALLBACK_URL"]
             ?? bundle.object(forInfoDictionaryKey: "DiscogsCallbackURL") as? String
+            ?? persistedConfiguration?.callbackURL.absoluteString
             ?? "\(callbackScheme)://discogs/auth"
-
-        DiscogsAuthDebugLogger.logConfigurationProbe(
-            consumerKey: consumerKey,
-            consumerSecret: consumerSecret,
-            callbackScheme: callbackScheme,
-            callbackURLString: callbackURLString
-        )
 
         guard
             let consumerKey,
@@ -97,12 +70,21 @@ struct DiscogsAuthConfiguration: Sendable {
             return nil
         }
 
-        return DiscogsAuthConfiguration(
+        let configuration = DiscogsAuthConfiguration(
             consumerKey: consumerKey,
             consumerSecret: consumerSecret,
             callbackScheme: callbackScheme,
             callbackURL: callbackURL
         )
+        try? configurationStore.saveConfiguration(
+            PersistedDiscogsAuthConfiguration(
+                consumerKey: configuration.consumerKey,
+                consumerSecret: configuration.consumerSecret,
+                callbackScheme: configuration.callbackScheme,
+                callbackURL: configuration.callbackURL
+            )
+        )
+        return configuration
     }
 }
 
@@ -305,6 +287,12 @@ protocol DiscogsCredentialStoring: Sendable {
     func clearCredentials() throws
 }
 
+protocol DiscogsAuthConfigurationStoring: Sendable {
+    func loadConfiguration() throws -> PersistedDiscogsAuthConfiguration?
+    func saveConfiguration(_ configuration: PersistedDiscogsAuthConfiguration) throws
+    func clearConfiguration() throws
+}
+
 struct KeychainDiscogsCredentialStore: DiscogsCredentialStoring, Sendable {
     let service: String
     let account: String
@@ -359,6 +347,75 @@ struct KeychainDiscogsCredentialStore: DiscogsCredentialStoring, Sendable {
     }
 
     func clearCredentials() throws {
+        let status = SecItemDelete(baseQuery() as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainStoreError(status: status)
+        }
+    }
+
+    private func baseQuery() -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
+    }
+}
+
+struct KeychainDiscogsAuthConfigurationStore: DiscogsAuthConfigurationStoring, Sendable {
+    let service: String
+    let account: String
+
+    init(
+        service: String = Bundle.main.bundleIdentifier ?? "wax.discogs",
+        account: String = "discogs.oauth.configuration"
+    ) {
+        self.service = service
+        self.account = account
+    }
+
+    func loadConfiguration() throws -> PersistedDiscogsAuthConfiguration? {
+        var query = baseQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        switch status {
+        case errSecSuccess:
+            guard let data = item as? Data else {
+                throw DiscogsAuthError.malformedResponse
+            }
+            return try JSONDecoder().decode(PersistedDiscogsAuthConfiguration.self, from: data)
+        case errSecItemNotFound:
+            return nil
+        default:
+            throw KeychainStoreError(status: status)
+        }
+    }
+
+    func saveConfiguration(_ configuration: PersistedDiscogsAuthConfiguration) throws {
+        let data = try JSONEncoder().encode(configuration)
+        var query = baseQuery()
+        let attributes = [kSecValueData as String: data]
+        let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+
+        if status == errSecItemNotFound {
+            query[kSecValueData as String] = data
+            let addStatus = SecItemAdd(query as CFDictionary, nil)
+            guard addStatus == errSecSuccess else {
+                throw KeychainStoreError(status: addStatus)
+            }
+            return
+        }
+
+        guard status == errSecSuccess else {
+            throw KeychainStoreError(status: status)
+        }
+    }
+
+    func clearConfiguration() throws {
         let status = SecItemDelete(baseQuery() as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainStoreError(status: status)
@@ -533,7 +590,7 @@ private enum FormEncodedParser {
     }
 }
 
-private enum OAuth1Signer {
+enum OAuth1Signer {
     static func authorizationHeader(
         method: String,
         url: URL,
