@@ -33,4 +33,40 @@ struct DatabaseSchemaTests {
         #expect(record.id != UUID())
         #expect(record.discogsID == 42)
     }
+
+    @Test
+    func grdbRecordRepositoryRoundTripsRecord() async throws {
+        let configuration = DatabaseConfiguration(
+            sqliteFileName: "wax-tests-\(UUID().uuidString).sqlite",
+            enablesDevelopmentSeed: true
+        )
+        let databaseURL = try configuration.databaseURL()
+        let manager = GRDBDatabaseManager(configuration: configuration)
+        let repository = GRDBRecordRepository(databaseManager: manager)
+        let timestamp = Date(timeIntervalSince1970: 1_000)
+        let record = Record(
+            discogsID: 99,
+            title: "Moon Safari",
+            artist: "Air",
+            year: 1998,
+            format: "LP",
+            notes: "Bootstrapped",
+            condition: .nearMint,
+            syncStatus: .pending,
+            createdAt: timestamp,
+            updatedAt: timestamp
+        )
+
+        try await manager.prepareDatabase()
+        try await repository.upsert(record)
+
+        let fetched = try await repository.fetchRecord(discogsID: 99)
+
+        #expect(fetched?.title == "Moon Safari")
+        #expect(fetched?.artist == "Air")
+        #expect(fetched?.condition == .nearMint)
+        #expect(fetched?.syncStatus == .pending)
+
+        try? FileManager.default.removeItem(at: databaseURL)
+    }
 }

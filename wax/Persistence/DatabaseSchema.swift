@@ -95,7 +95,7 @@ enum DatabaseSchema {
 
     static let developmentSeedStatements: [String] = [
         """
-        INSERT INTO sync_checkpoint (
+        INSERT OR IGNORE INTO sync_checkpoint (
             id,
             scope,
             cursor,

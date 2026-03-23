@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 
 struct DatabaseConfiguration: Sendable {
     let sqliteFileName: String
@@ -10,6 +11,12 @@ struct DatabaseConfiguration: Sendable {
     ) {
         self.sqliteFileName = sqliteFileName
         self.enablesDevelopmentSeed = enablesDevelopmentSeed
+    }
+
+    nonisolated func databaseURL(fileManager: FileManager = .default) throws -> URL {
+        try fileManager
+            .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            .appendingPathComponent(sqliteFileName, isDirectory: false)
     }
 }
 
@@ -43,5 +50,83 @@ struct DatabaseBootstrapPlan: Sendable {
         self.developmentSeedStatements = configuration.enablesDevelopmentSeed
             ? DatabaseSchema.developmentSeedStatements
             : []
+    }
+}
+
+actor GRDBDatabaseManager: DatabaseManaging {
+    let configuration: DatabaseConfiguration
+
+    private let fileManager: FileManager
+    private var databaseQueue: DatabaseQueue?
+
+    init(
+        configuration: DatabaseConfiguration = DatabaseConfiguration(),
+        fileManager: FileManager = .default
+    ) {
+        self.configuration = configuration
+        self.fileManager = fileManager
+    }
+
+    func prepareDatabase() async throws {
+        if databaseQueue != nil {
+            return
+        }
+
+        let queue = try DatabaseQueue(path: databasePath())
+        var migrator = DatabaseMigrator()
+
+        for migration in DatabaseSchema.migrations {
+            migrator.registerMigration(migration.id) { db in
+                do {
+                    for statement in migration.statements {
+                        try db.execute(sql: statement)
+                    }
+                } catch {
+                    throw DatabaseManagerError.migrationFailed(
+                        migrationID: migration.id,
+                        underlyingMessage: error.localizedDescription
+                    )
+                }
+            }
+        }
+
+        try migrator.migrate(queue)
+
+        if configuration.enablesDevelopmentSeed {
+            try await queue.write { db in
+                for statement in DatabaseSchema.developmentSeedStatements {
+                    try db.execute(sql: statement)
+                }
+            }
+        }
+
+        databaseQueue = queue
+    }
+
+    func read<T: Sendable>(_ value: @Sendable (Database) throws -> T) async throws -> T {
+        let queue = try await queue()
+        return try await queue.read(value)
+    }
+
+    func write<T: Sendable>(_ value: @Sendable (Database) throws -> T) async throws -> T {
+        let queue = try await queue()
+        return try await queue.write(value)
+    }
+
+    private func queue() async throws -> DatabaseQueue {
+        if databaseQueue == nil {
+            try await prepareDatabase()
+        }
+
+        guard let databaseQueue else {
+            throw DatabaseManagerError.databaseUnavailable
+        }
+
+        return databaseQueue
+    }
+
+    private func databasePath() throws -> String {
+        let url = try configuration.databaseURL(fileManager: fileManager)
+        return url.path(percentEncoded: false)
     }
 }

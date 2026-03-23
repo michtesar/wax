@@ -13,7 +13,7 @@ struct Record: Identifiable, Hashable, Codable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         discogsID: Int? = nil,
         title: String,
@@ -51,7 +51,7 @@ struct CollectionEntry: Identifiable, Hashable, Codable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         recordID: UUID,
         discogsInstanceID: Int? = nil,
@@ -87,7 +87,7 @@ struct SyncOperation: Identifiable, Hashable, Codable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         entityType: SyncEntityType,
         entityID: UUID,
@@ -122,7 +122,7 @@ struct SyncCheckpoint: Identifiable, Hashable, Codable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         scope: SyncScope,
         cursor: String? = nil,
@@ -152,7 +152,7 @@ struct ImageAsset: Identifiable, Hashable, Codable, Sendable {
     var createdAt: Date
     var updatedAt: Date
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         recordID: UUID,
         discogsImageURL: URL? = nil,
