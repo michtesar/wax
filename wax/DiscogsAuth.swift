@@ -10,6 +10,39 @@ protocol _DiscogsProcessInfo {
 
 extension ProcessInfo: _DiscogsProcessInfo {}
 
+private enum DiscogsAuthDebugLogger {
+    static func logConfigurationProbe(
+        consumerKey: String?,
+        consumerSecret: String?,
+        callbackScheme: String?,
+        callbackURLString: String?
+    ) {
+#if DEBUG
+        let keyPresent = !(consumerKey?.isEmpty ?? true)
+        let secretPresent = !(consumerSecret?.isEmpty ?? true)
+        let sanitizedKeyPreview: String
+        if let consumerKey, consumerKey.count >= 4 {
+            sanitizedKeyPreview = String(consumerKey.prefix(4)) + "..."
+        } else if let consumerKey, !consumerKey.isEmpty {
+            sanitizedKeyPreview = consumerKey
+        } else {
+            sanitizedKeyPreview = "<missing>"
+        }
+
+        print(
+            """
+            [DiscogsAuth] Config probe:
+              consumerKeyPresent=\(keyPresent)
+              consumerKeyPreview=\(sanitizedKeyPreview)
+              consumerSecretPresent=\(secretPresent)
+              callbackScheme=\(callbackScheme ?? "<nil>")
+              callbackURL=\(callbackURLString ?? "<nil>")
+            """
+        )
+#endif
+    }
+}
+
 struct DiscogsAuthConfiguration: Sendable {
     let consumerKey: String
     let consumerSecret: String
@@ -46,6 +79,13 @@ struct DiscogsAuthConfiguration: Sendable {
         let callbackURLString = environment["WAX_DISCOGS_CALLBACK_URL"]
             ?? bundle.object(forInfoDictionaryKey: "DiscogsCallbackURL") as? String
             ?? "\(callbackScheme)://discogs/auth"
+
+        DiscogsAuthDebugLogger.logConfigurationProbe(
+            consumerKey: consumerKey,
+            consumerSecret: consumerSecret,
+            callbackScheme: callbackScheme,
+            callbackURLString: callbackURLString
+        )
 
         guard
             let consumerKey,
@@ -344,6 +384,11 @@ struct KeychainStoreError: LocalizedError, Sendable {
 
 @MainActor
 final class DiscogsAuthStore: ObservableObject {
+    enum Readiness: Equatable {
+        case unavailable(reason: String)
+        case ready(callbackURL: String)
+    }
+
     enum SessionState: Equatable {
         case unavailable
         case signedOut
@@ -354,6 +399,7 @@ final class DiscogsAuthStore: ObservableObject {
     @Published private(set) var sessionState: SessionState = .signedOut
     @Published private(set) var credentials: DiscogsCredentials?
     @Published var errorMessage: String?
+    @Published private(set) var readiness: Readiness
 
     private let authClient: (any DiscogsOAuthClienting)?
     private let credentialStore: any DiscogsCredentialStoring
@@ -365,7 +411,12 @@ final class DiscogsAuthStore: ObservableObject {
     ) {
         self.authClient = authClient
         self.credentialStore = credentialStore
-        if authClient == nil {
+        if let authClient {
+            readiness = .ready(callbackURL: authClient.configuration.callbackURL.absoluteString)
+        } else {
+            readiness = .unavailable(
+                reason: "Missing Discogs OAuth consumer key/secret in the current scheme."
+            )
             sessionState = .unavailable
         }
     }
@@ -448,6 +499,15 @@ final class DiscogsAuthStore: ObservableObject {
             sessionState = authClient == nil ? .unavailable : .signedOut
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    var readinessMessage: String {
+        switch readiness {
+        case let .ready(callbackURL):
+            return "Discogs OAuth ready. Callback: \(callbackURL)"
+        case let .unavailable(reason):
+            return reason
         }
     }
 }

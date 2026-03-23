@@ -32,12 +32,7 @@ struct ContentView: View {
     }
 
     private var authMessage: String? {
-        switch authStore.sessionState {
-        case .unavailable:
-            return "Add Discogs consumer key and secret to enable sign-in."
-        default:
-            return authStore.errorMessage
-        }
+        authStore.errorMessage ?? authStore.readinessMessage
     }
 
     var body: some View {

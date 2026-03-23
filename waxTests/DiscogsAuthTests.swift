@@ -33,6 +33,39 @@ struct DiscogsAuthTests {
 
         #expect(configuration == nil)
     }
+
+    @Test
+    @MainActor
+    func authStoreReportsReadinessWhenOAuthConfigurationExists() {
+        let store = DiscogsAuthStore(
+            authClient: TestDiscogsOAuthClient(),
+            credentialStore: InMemoryCredentialStore()
+        )
+
+        switch store.readiness {
+        case let .ready(callbackURL):
+            #expect(callbackURL == "wax://discogs/auth")
+        default:
+            Issue.record("Expected ready auth state.")
+        }
+        #expect(store.readinessMessage == "Discogs OAuth ready. Callback: wax://discogs/auth")
+    }
+
+    @Test
+    @MainActor
+    func authStoreReportsMissingConfigurationWhenOAuthConfigurationDoesNotExist() {
+        let store = DiscogsAuthStore(
+            authClient: nil,
+            credentialStore: InMemoryCredentialStore()
+        )
+
+        switch store.readiness {
+        case let .unavailable(reason):
+            #expect(reason.contains("Missing Discogs OAuth consumer key/secret"))
+        default:
+            Issue.record("Expected unavailable auth state.")
+        }
+    }
 }
 
 @MainActor

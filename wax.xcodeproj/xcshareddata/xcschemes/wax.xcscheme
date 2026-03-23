@@ -76,13 +76,13 @@
       </BuildableProductRunnable>
       <EnvironmentVariables>
          <EnvironmentVariable
-            key = "WAX&#x200b;_&#x200b;DISCOGS&#x200b;_&#x200b;CONSUMER&#x200b;_&#x200b;SECRET"
-            value = "MHGnzvnSfTwvuhnfFdJFcSQNEdRECQLy"
+            key = "WAX_DISCOGS_CONSUMER_KEY"
+            value = "KYeTtrPfgmpokiuhYYNq"
             isEnabled = "YES">
          </EnvironmentVariable>
          <EnvironmentVariable
-            key = "WAX&#x200b;_&#x200b;DISCOGS&#x200b;_&#x200b;CONSUMER&#x200b;_&#x200b;KEY"
-            value = "KYeTtrPfgmpokiuhYYNq"
+            key = "WAX_DISCOGS_CONSUMER_SECRET"
+            value = "MHGnzvnSfTwvuhnfFdJFcSQNEdRECQLy"
             isEnabled = "YES">
          </EnvironmentVariable>
       </EnvironmentVariables>
